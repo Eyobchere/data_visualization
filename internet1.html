@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+    <style>
+    </style>
+    <script type="text/javascript">
+      function draw(geo_data) {
+        "use strict";
+        var margin = 75,
+            width = 1400 - margin,
+            height = 600 - margin;
+
+        var svg = d3.select("body")
+            .append("svg")
+            .attr("width", width + margin)
+            .attr("height", height + margin)
+            .append('g')
+            .attr('class', 'map');
+
+        var projection = d3.geo.mercator()
+                               .scale(140)
+                               .translate([width / 2, height / 1.2]);
+
+        var path = d3.geo.path().projection(projection);
+
+        var map = svg.selectAll('path')
+                     .data(geo_data.features)
+                     .enter()
+                     .append('path')
+                     .attr('d', path)
+                     .style('fill', 'lightBlue')
+                     .style('stroke', 'black')
+                     .style('stroke-width', 0.5);
+
+        function plot_points(data) {
+
+            function agg_year_country(leaves) {
+
+                var total_user=d3.sum(leaves, function(d){
+                  //console.log(d["Value"]);
+                    return +d["Value"]
+              });
+               var coord=leaves.map(function(d){
+
+                 return projection([+d.longitude, +d.latitude])
+               });
+               var center_x = d3.mean(coord,function(d){
+                 //console.log(d[0]) //in pixels
+                   return d[0]
+               });
+               var center_y = d3.mean(coord,function(d){
+                 //console.log(d[1])
+                   return d[1]
+               });
+               var countries = d3.set();
+
+               leaves.forEach(function(d) {
+                   countries.add(d['Country']);
+                   //teams.add(d['team2']);
+
+               });
+
+               return{
+                 'total_user':total_user,
+
+                 'x':center_x,
+                 'y':center_y,
+               };
+
+            }
+          var nested = d3.nest()
+                            //debugger;
+                            //console.log(nested)
+                          .key(function(d) {
+                             //console.log(nested)
+                             //console.log(d)
+                              //debugger;
+                                 return d['Year'];})
+                          .key(function(d){
+                               return d['Country'];})//.getUTCFullYear();
+
+                           //})
+                           //console.log(nested)
+                           //debugger;
+                           .rollup(agg_year_country)
+
+                           .entries(data);
+                           //debugger;
+        /*  var total_user_max = d3.max(nested, function(d) {
+                return d.values['total_user'];
+              });
+
+          var radius = d3.scale.sqrt()
+             .domain([0, total_user_max])
+             .range([0, 15]);*/
+          function key_func(d) {
+              return d['key'];}
+          // var filtered = nested.filter(function(d) {
+                                        // pick any year for your first visualization:
+                //  return d['key']=== "2015"//d["Year"]
+                                //return d['key']=== '2005';
+                    //  });
+                           //console.log("filtered")
+
+                            //console.log(filtered)
+         svg.append('g')
+            .attr("class", "bubble")
+            .selectAll("circle")
+            //.data(filtered[0]["values"])
+            .data(nested.sort(function(a, b) {
+                return b.values['total_user'] - a.values['total_user'];
+                  }), key_func)
+
+             .enter()
+             .append("circle")
+             .attr('cx',function(d,i){
+                   return d.values['x'];})
+             .attr('cy',function(d){
+                        return d.values['y'];})
+             .attr("r",function(d){
+                    return  5;//radius(d.values['total_user']);
+                             })
+
+                            //  .attr('r',function(d){return
+                              //  radius(d.values['total_user']);})
+                              //.attr('fill','rgb(247,328,98)')
+                              //.attr('stroke','green')
+                              //.attr('stroke-width',0.7)
+                              //.attr('opacity',0.8);
+                              //function update(year) {
+                              //    var filtered = nested.filter(function(d) {
+                              //        return new Date(d['key']).getUTCFullYear() === year;
+                              //    });*/
+            function update(year) {
+              var newFiltered = nested.filter(function(d) {
+                  //console.log(d)
+                  return new Date(d['key']).getUTCFullYear() === year;
+                      });
+                      //console.log("newFiltered")
+                      //console.log(newFiltered)
+                      //console.log(newFiltered[0])
+           var total_user_max = d3.max(newFiltered[0].values, function(d) {
+                    return d.values['total_user'];
+                          });
+
+           var radius = d3.scale.sqrt()
+                          .domain([0, total_user_max])
+                          .range([0, 15]);
+            var circles=svg.selectAll('circle')
+               .data(newFiltered[0].values)
+            circles.exit().remove();
+            circles.enter()
+                   .append('circle')
+                   .attr('cx',function(d){
+                       //console.log(d.values['x'])
+                        return d.values['x'];})
+                    .attr('cy',function(d,i){
+                         return d.values['y'];})
+                    .attr("r",function(d){ //console.log(d)
+                              return  radius(d.values["total_user"]);})
+                    .attr('fill','rgb(247,328,98)')
+                    .attr('stroke','green')
+                    .attr('stroke-width',0.7)
+                    .attr('opacity',0.8);
+            var labels= svg.selectAll("text")
+                          .data(newFiltered[0].values)
+                          .enter()
+                          .append("text")
+                          .style("color","Green")
+                          .text(function(d){
+                          //console.log(d.key)
+                              return d.key;})
+                          .attr("x", function(d) {
+                              return d.values['x'];})
+                          .attr("y", function(d) {
+                              return d.values['y'];})
+                          //  });
+          //update(1980);
+                             };
+         update(2010)
+                            //  debugger;
+
+                              //debugger;
+        };
+
+        var format = d3.time.format("%Y");
+
+        d3.csv("UNdata_cleaned.csv", function(d) {
+             d['Value'] = +d['Value'];
+             d['Year'] = d['Year']//format.parse(d['Year']);
+          return d;
+        }, plot_points);
+      };
+      </script>
+  </head>
+<body>
+  <script type="text/javascript">
+  /*
+    Use D3 to load the GeoJSON file
+    */
+
+d3.json("world_countries.json", draw);
+  </script>
+</body>
+</html>
