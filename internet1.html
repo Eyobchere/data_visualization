@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+    <style>
+    h2 {
+      text-align: center;
+      color: black;
+    }
+    div.years_buttons {
+      position: fixed;
+      top: 5px;
+      left: 50px;
+    }
+
+    div.years_buttons div {
+      background-color: rgb(251, 201, 127);
+      padding: 3px;
+      margin: 7px;
+    }
+    div.tooltip {
+    position: absolute;
+    text-align: center;
+    width: 60px;
+    height: 28px;
+    padding: 2px;
+    font: 12px sans-serif;
+    background: lightsteelblue;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+    }
+    </style>
+    <script type="text/javascript">
+      function draw(geo_data) {
+        "use strict";
+        var margin = 75,
+            width = 1400 - margin,
+            height = 600 - margin;
+            d3.select("body")
+              .append("h2")
+              .text("Internet User per 100 People ");
+        var svg = d3.select("body")
+            .append("svg")
+            .attr("width", width + margin)
+            .attr("height", height + margin)
+            .append('g')
+            .attr('class', 'map');
+
+        var years = [];
+            for(var i = 1983; i < 2016; i += 1) {
+                years.push(i);}
+
+      /* var buttons = d3.select("body")
+                      .append("div")
+                      .attr("class", "years_buttons")
+                      .selectAll("div")
+                      .data(years)
+                      .enter()
+                      .append("div")
+                      .text(function(d) {
+                            return d;
+                          });*/
+
+        var projection = d3.geo.mercator()
+                               .scale(140)
+                               .translate([width / 2, height / 1.2]);
+
+        var path = d3.geo.path().projection(projection);
+
+        var map = svg.selectAll('path')
+                     .data(geo_data.features)
+                     .enter()
+                     .append('path')
+                     .attr('d', path)
+                     .style('fill', 'lightBlue')
+                     .style('stroke', 'black')
+                     .style('stroke-width', 0.5);
+
+        function plot_points(data) {
+
+            function agg_year_country(leaves) {
+
+                var total_user=d3.sum(leaves, function(d){
+                  //console.log(d["Value"]);
+                    return +d["Value"]
+              });
+               var coord=leaves.map(function(d){
+
+                 return projection([+d.longitude, +d.latitude])
+               });
+               var center_x = d3.mean(coord,function(d){
+                 //console.log(d[0]) //in pixels
+                   return d[0]
+               });
+               var center_y = d3.mean(coord,function(d){
+                 //console.log(d[1])
+                   return d[1]
+               });
+               var countries = d3.set();
+
+               leaves.forEach(function(d) {
+                 //console.log(d['Country'])
+                   countries.add(d['Cname']);
+                   //teams.add(d['team2']);
+              //console.log(countries);
+               });
+
+               return{
+                 'total_user':total_user,
+
+                 'x':center_x,
+                 'y':center_y,
+                 'country_name' : countries.values(),
+               };
+
+            }
+          var nested = d3.nest()
+                            //debugger;
+                            //console.log(nested)
+                          .key(function(d) {
+                             //console.log(nested)
+                             //console.log(d)
+                              //debugger;
+                                 return d['Year'];})
+                          .key(function(d){
+                               return d['Country'];})//.getUTCFullYear();
+
+                           //})
+                           //console.log(nested)
+                           //debugger;
+                           .rollup(agg_year_country)
+
+                           .entries(data);
+                           //debugger;
+        /*  var total_user_max = d3.max(nested, function(d) {
+                return d.values['total_user'];
+              });
+
+          var radius = d3.scale.sqrt()
+             .domain([0, total_user_max])
+             .range([0, 15]);*/
+          function key_func(d) {
+              return d['key'];}
+          // var filtered = nested.filter(function(d) {
+                                        // pick any year for your first visualization:
+                //  return d['key']=== "2015"//d["Year"]
+                                //return d['key']=== '2005';
+                    //  });
+                           //console.log("filtered")
+
+                            //console.log(filtered)
+         svg.append('g')
+            .attr("class", "bubble")
+            .selectAll("circle")
+            //.data(filtered[0]["values"])
+            .data(nested.sort(function(a, b) {
+                return b.values['total_user'] - a.values['total_user'];
+                  }), key_func)
+
+             .enter()
+             .append("circle")
+             .attr('cx',function(d,i){
+                   return d.values['x'];})
+             .attr('cy',function(d){
+                        return d.values['y'];})
+             .attr("r",function(d){
+                    return  5;//radius(d.values['total_user']);
+                             })
+
+                            //  .attr('r',function(d){return
+                              //  radius(d.values['total_user']);})
+                              //.attr('fill','rgb(247,328,98)')
+                              //.attr('stroke','green')
+                              //.attr('stroke-width',0.7)
+                              //.attr('opacity',0.8);
+                              //function update(year) {
+                              //    var filtered = nested.filter(function(d) {
+                              //        return new Date(d['key']).getUTCFullYear() === year;
+                              //    });*/
+            function update(year) {
+              var newFiltered = nested.filter(function(d) {
+                  //console.log(d)
+                  return new Date(d['key']).getUTCFullYear() === year;
+                      });
+              d3.select("h2")
+                .text("Internet User per 100 People " + year);
+                      //console.log("newFiltered")
+                      //console.log(newFiltered)
+                      //console.log(newFiltered[0])
+              var total_user_max = d3.max(newFiltered[0].values, function(d) {
+                    return d.values['total_user'];
+                          });
+
+              var radius = d3.scale.sqrt()
+                          .domain([0, total_user_max])
+                          .range([0, 15]);
+             var circles=svg.selectAll('circle')
+                        .data(newFiltered[0].values,key_func);
+            circles.exit().remove();
+            circles.enter()
+                   .append('circle')
+                   .transition()
+                   .duration(500)
+                   .attr('cx',function(d){
+                       //console.log(d.key)
+                        return d.values['x'];})
+                    .attr('cy',function(d,i){
+                      //console.log(d.key)
+                         return d.values['y'];})
+                    .attr("r",function(d){ //console.log(d.key)
+                              return  radius(d.values["total_user"]);})
+                    .attr('fill','rgb(247,328,98)')
+                    .attr('stroke','green')
+                    .attr('stroke-width',0.7)
+                    .attr('opacity',0.8);
+
+          /*var div = d3.select("body").append("div")
+                      .attr("class", "tooltip")
+                      .style("opacity", 0);
+          var labels= svg.selectAll("text")
+                          .data(newFiltered[0].values)
+                          .enter()
+                          .append("text")
+                          .transition()
+                          .duration(500)
+                          .style("color","red")
+                          .text(function(d){
+                          //console.log(d.key)
+                              return d.key;})
+                          .attr("x", function(d) {
+                              //console.log(d.key)
+                              return d.values['x'];})
+                          .attr("y", function(d) {
+                            //console.log(d.key)
+                              return d.values['y'];})
+                          .on("mouseover", function(d) {
+                             div.transition()
+                                 .duration(200)
+                                 .style("opacity", .9);
+                            div	.html(12 + "<br/>"  + 4)
+                                .style("left", (d3.event.pageX) + "px")
+                                .style("top", (d3.event.pageY - 28) + "px");
+            })
+        .on("mouseout", function(d) {
+            div.transition()
+                .duration(500)
+                .style("opacity", 0);
+        });
+                          //.transition().duration(1000)
+                          //  });*/
+          //var countries=d3.set()
+          /*var filtered_countries = newFiltered[0].values["country_name"];  //.forEach(function(d){
+
+                    //    return d.key;
+                  // });
+          //{//console.log(d.key)
+              //return d.key;};
+            console.log(filtered_countries);
+
+
+
+
+             svg.selectAll('path')
+                .style('fill', function(d){
+                      if(filtered_countries.indexOf(d.properties.name) !== -1) {
+                           return "lightBlue";
+                       } else {
+                           return 'white';
+                       }
+                   })
+                //.style('stroke', function(d){
+                //           if(countries.indexOf(d.properties.name) !== -1) {
+                //           return "lightBlue";
+              //         } else {
+              //             return 'white';
+              //         });*/
+
+          //update(1980);
+                             };
+        /*  var years = [];
+              for(var i = 1983; i < 2016; i += 1) {
+                  years.push(i);}*/
+             //console.log(years);
+            var year_idx = 0;
+               //console.log(years[year_idx])
+            var year_interval = setInterval(function() {
+                update(years[year_idx]);
+
+                                //.transition().duration(1000)
+                                //  });
+                year_idx++;
+
+                if(year_idx >= years.length) {
+                     clearInterval(year_interval);
+                   }
+                    //console.log(update(years[year_idx]));
+                  },1000);
+           var buttons = d3.select("body")
+                             .append("div")
+                             .attr("class", "years_buttons")
+                             .selectAll("div")
+                             .data(years)
+                             .enter()
+                             .append("div")
+                             .text(function(d) {
+                                 return d;
+                             });
+            buttons.on("click", function(d) {
+                        d3.select(".years_buttons")
+                           .selectAll("div")
+                           .transition()
+                           .duration(500)
+                           .style("color", "black")
+                           .style("background", "rgb(251, 201, 127)");
+
+                     //buttons.on("click", function(d) {
+                         d3.select(this)
+                           .transition()
+                           .duration(500)
+                           .style("background", "lightBlue")
+                           .style("color", "white");
+                         update(d);
+                     });
+
+            //   }
+                //console.log(update(years[year_idx]));
+            //  },1000);
+         //update(2015)
+        };
+
+        var format = d3.time.format("%d-%m-%Y (%H:%M h)");
+
+        d3.csv("UNdata_cleaned.csv", function(d) {
+             d['Value'] = +d['Value'];
+             d['Year'] = d['Year'];
+          return d;
+        }, plot_points);
+      };
+      </script>
+  </head>
+<body>
+  <script type="text/javascript">
+  /*
+    Use D3 to load the GeoJSON file
+    */
+
+d3.json("world_countries.json", draw);
+  </script>
+</body>
+</html>
